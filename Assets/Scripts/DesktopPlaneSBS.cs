@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Video.Model;
@@ -17,10 +18,42 @@ namespace Assets.Scripts
         private int desktopheight = 0;
         float g_threshold = 0.4f;//初始曲率
         float g_perfoot = 0.2f;//步幅
+        private int autosleeptime = 2;
+        private int Milliseconds = 22;
 
+        void Awake()
+        {
+            Application.targetFrameRate = -1;
+        }
+
+        void OnDestroy()
+        {
+            if (ct1 != null)
+            {
+                ct1.Abort();
+            }
+            if (ct2 != null)
+            {
+                ct2.Abort();
+            }
+            if (ct3 != null)
+            {
+                ct3.Abort();
+            }
+            if (bytelist.Count > 0)
+            {
+                for (int i = 0; i < bytelist.Count; i++)
+                {
+                    bytelist.RemoveAt(0);
+                }
+            }
+        }
+
+        private Thread ct1;
+        private Thread ct2;
+        private Thread ct3;
         void Start()
         {
-            Application.targetFrameRate = 60;
             gameObject.AddComponent<MeshFilter>();
             mesh = CreateArcSurface(g_threshold);
             this.GetComponent<MeshFilter>().mesh = mesh;
@@ -35,32 +68,79 @@ namespace Assets.Scripts
             desktopheight = desktopImage.Height;
             desktopImage.Dispose();
             desktopImage = null;
+
+            //新建线程
+            ct1 = new Thread(CaptureWindowThread);
+            ct1.Start();
+            //ct2 = new Thread(CaptureWindowThread);
+            //ct2.Start();
+            //ct3 = new Thread(CaptureWindowThread);
+            //ct3.Start();
         }
 
         private Texture2D texture;
         private GdiScreenCapture sc;
         void Update()
         {
-            Debug.Log("Update");
             if (m)
             {
+                Debug.Log("Update " + bytelist.Count + " " + autosleeptime);
                 KeyDownEvent();
-                if (sc == null)
-                    sc = new GdiScreenCapture();
-                Image img1 = null;
-                img1 = sc.CaptureWindowSBS(desktopwidth, desktopheight);
+                //if (sc == null)
+                //    sc = new GdiScreenCapture();
+                //Image img1 = null;
+                //img1 = sc.CaptureWindowSBS(desktopwidth, desktopheight);
 
                 if (texture == null)
-                    texture = new Texture2D(img1.Width, img1.Height);
+                    texture = new Texture2D(desktopwidth, desktopheight);
 
-                var bimage = sc.PhotoImageInsert(img1);
-                //Debug.Log(img1.Width + " " + img1.Height + " " + bimage.Length);
-                img1.Dispose();
-                img1 = null;
-                texture.LoadImage(bimage);
-                m.mainTexture = texture;
+                //var bimage = sc.PhotoImageInsert(img1);
+                if (bytelist.Count > 0)
+                {
+                    var bimage = bytelist[0];
+                    texture.LoadImage(bimage);
+                    m.mainTexture = texture;
+                    bytelist.RemoveAt(0);
+                    bimage = null;
+                }
+                //img1.Dispose();
+                //img1 = null;
                 //PlaneImage.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
                 //PlaneImage.gameObject.SetActive(true);
+            }
+        }
+
+        DateTime CaptureTime = DateTime.Now;
+        List<byte[]> bytelist = new List<byte[]>();
+        void CaptureWindowThread()
+        {
+            var gsc = new GdiScreenCapture();
+            while (true)
+            {
+                //if (bytelist.Count == 0)
+                //{
+                //    autosleeptime -= 2;
+                //}
+                //else
+                //{
+                //    autosleeptime += 2;
+                //}
+                //用于控制每间隔n毫秒执行一次截图
+                if (CaptureTime.AddMilliseconds(Milliseconds) <= DateTime.Now)
+                {
+                    CaptureTime = DateTime.Now;
+                    Image img1 = gsc.CaptureWindowSBS(desktopwidth, desktopheight);
+                    //imagelist.Add(img1);
+                    var bimage = gsc.PhotoImageInsert(img1);
+                    bytelist.Add(bimage);
+                    img1.Dispose();
+                    img1 = null;
+                    Thread.Sleep(autosleeptime);
+                }
+                //else
+                //{
+                //    Thread.Sleep(autosleeptime);
+                //}
             }
         }
 
@@ -120,11 +200,11 @@ namespace Assets.Scripts
                 Debug.Log("F3");
                 SceneManager.LoadScene("SampleScene");
             }
-            else if (Input.GetKeyDown(KeyCode.F4))
-            {
-                Debug.Log("F4");
-                SceneManager.LoadScene("UVScene");
-            }
+            //else if (Input.GetKeyDown(KeyCode.F4))
+            //{
+            //    Debug.Log("F4");
+            //    SceneManager.LoadScene("UVScene");
+            //}
         }
         private Mesh CreateArcSurface(float threshold)
         {

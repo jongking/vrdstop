@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Video.Model;
@@ -18,7 +19,36 @@ namespace Assets.Scripts
         private Material m;
         private int desktopwidth = 0;
         private int desktopheight = 0;
+        private int orgindesktopwidth = 0;
+        private int orgindesktopheight = 0;
         //public UnityEngine.UI.Image PlaneImage;
+
+        void OnDestroy()
+        {
+            if (ct1 != null)
+            {
+                ct1.Abort();
+            }
+            if (ct2 != null)
+            {
+                ct2.Abort();
+            }
+            if (ct3 != null)
+            {
+                ct3.Abort();
+            }
+            if (bytelist.Count > 0)
+            {
+                for (int i = 0; i < bytelist.Count; i++)
+                {
+                    bytelist.RemoveAt(0);
+                }
+            }
+        }
+
+        private Thread ct1;
+        private Thread ct2;
+        private Thread ct3;
         void Start()
         {
             //UnityEngine.UI.Image PlaneImage = GetComponent<UnityEngine.UI.Image>();
@@ -29,9 +59,19 @@ namespace Assets.Scripts
             Image desktopImage = sc.CaptureWindowUV(0, 0);
             desktopwidth = desktopImage.Width;
             desktopheight = desktopImage.Height;
+            orgindesktopwidth = desktopImage.Width;
+            orgindesktopheight = desktopImage.Height;
             desktopImage.Dispose();
             desktopImage = null;
             Debug.Log("Start");
+
+            //新建线程
+            ct1 = new Thread(CaptureWindowThread);
+            ct1.Start();
+            ct2 = new Thread(CaptureWindowThread);
+            ct2.Start();
+            ct3 = new Thread(CaptureWindowThread);
+            ct3.Start();
         }
 
         private Texture2D texture;
@@ -43,25 +83,44 @@ namespace Assets.Scripts
             if (m)
             {
                 KeyDownEvent();
-                Debug.Log("Update2 " + desktopwidth + "|" + desktopheight);
-                if(sc == null)
-                    sc = new GdiScreenCapture();
-                Image img1 = null;
-                img1 = sc.CaptureWindowUV(desktopwidth, desktopheight);
+                //Debug.Log("Update2 " + desktopwidth + "|" + desktopheight);
+                //if(sc == null)
+                //    sc = new GdiScreenCapture();
+                //Image img1 = null;
+                //img1 = sc.CaptureWindowUV(desktopwidth, desktopheight);
 
                 if (texture == null)
-                    texture = new Texture2D(img1.Width, img1.Height);
+                    texture = new Texture2D(desktopwidth, desktopheight);
 
-                var bimage = sc.PhotoImageInsert(img1);
-                //Debug.Log(img1.Width + " " + img1.Height + " " + bimage.Length);
+                //var bimage = sc.PhotoImageInsert(img1);
+                //img1.Dispose();
+                //img1 = null;
+                //texture.LoadImage(bimage);
+                //m.SetTexture("_MainTex", texture);
+                if (bytelist.Count > 0)
+                {
+                    Debug.Log("Update" + bytelist.Count);
+                    var bimage = bytelist[0];
+                    texture.LoadImage(bimage);
+                    m.SetTexture("_MainTex", texture);
+                    bytelist.RemoveAt(0);
+                    bimage = null;
+                }
+            }
+        }
+
+        List<byte[]> bytelist = new List<byte[]>();
+        void CaptureWindowThread()
+        {
+            while (true)
+            {
+                var gsc = new GdiScreenCapture();
+                Image img1 = gsc.CaptureWindowSBS(desktopwidth, desktopheight);
+                var bimage = gsc.PhotoImageInsert(img1);
+                bytelist.Add(bimage);
                 img1.Dispose();
                 img1 = null;
-                texture.LoadImage(bimage);
-                m.SetTexture("_MainTex", texture);
-                //Debug.Log(" " + bimage.Length);
-                //m.mainTexture = texture;
-                //PlaneImage.sprite = Sprite.Create(texture, new Rect(0, 0, texture.width, texture.height), new Vector2(0.5f, 0.5f));
-                //PlaneImage.gameObject.SetActive(true);
+                Thread.Sleep(20);
             }
         }
 
@@ -75,6 +134,17 @@ namespace Assets.Scripts
             {
                 desktopwidth -= 200;
             }
+            else if (Input.GetKeyDown(KeyCode.Z))
+            {
+                if (desktopwidth != orgindesktopwidth)
+                {
+                    desktopwidth = orgindesktopwidth;
+                }
+                else
+                {
+                    desktopwidth = orgindesktopwidth + orgindesktopwidth;
+                }
+            }
             else if (Input.GetKeyDown(KeyCode.W))
             {
                 desktopheight += 200;
@@ -82,6 +152,17 @@ namespace Assets.Scripts
             else if (Input.GetKeyDown(KeyCode.S))
             {
                 desktopheight -= 200;
+            }
+            else if (Input.GetKeyDown(KeyCode.X))
+            {
+                if (desktopheight != orgindesktopheight)
+                {
+                    desktopheight = orgindesktopheight;
+                }
+                else
+                {
+                    desktopheight = orgindesktopheight + orgindesktopheight;
+                }
             }
             else if (Input.GetKeyDown(KeyCode.UpArrow))
             {

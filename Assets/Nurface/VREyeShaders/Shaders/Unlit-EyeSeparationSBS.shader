@@ -34,9 +34,16 @@ SubShader {
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
+			struct Input
+			{
+				float3 worldPos;
+				float3 worldNormal;
+			};
+
 			sampler2D _MainTex;
 			float4 _MainTex_ST;
 			float4 _EyeTransformVector;
+			int _ShowType;
 			
 			v2f vert (appdata_t v)
 			{
@@ -45,17 +52,28 @@ SubShader {
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				o.texcoord = TRANSFORM_TEX(v.texcoord, _MainTex);
-				o.texcoord = (o.texcoord * _EyeTransformVector.wz + _EyeTransformVector.yx)
+				if (_ShowType == 1) {
+					o.texcoord = (o.texcoord * _EyeTransformVector.wz + _EyeTransformVector.yx);
+				}
+				else if (_ShowType == 2) {
+					o.texcoord = (o.texcoord * _EyeTransformVector.wz * float2(2, 1) + _EyeTransformVector.yx);
+				}
+				else if (_ShowType == 3) {
+					o.texcoord = (o.texcoord * _EyeTransformVector.zw + _EyeTransformVector.xy);
+				}
+				else if (_ShowType == 4) {
+					o.texcoord = (o.texcoord * _EyeTransformVector.zw * float2(2, 1) + _EyeTransformVector.xy);
+				}
 				UNITY_TRANSFER_FOG(o,o.vertex);
 				return o;
 			}
 			
 			fixed4 frag (v2f i) : SV_Target
 			{				
-				fixed4 col = tex2D(_MainTex, i.texcoord);				
-				UNITY_APPLY_FOG(i.fogCoord, col);
-				UNITY_OPAQUE_ALPHA(col.a);				
-				return col;
+					fixed4 col = tex2D(_MainTex, i.texcoord);
+					UNITY_APPLY_FOG(i.fogCoord, col);
+					UNITY_OPAQUE_ALPHA(col.a);
+					return col;
 			}
 		ENDCG
 	}
